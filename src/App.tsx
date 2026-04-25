@@ -44,85 +44,88 @@ export default function App() {
   }, [messages]);
 
   const sendMessage = useCallback(async (text: string) => {
-  const trimmed = text.trim();
-  if (!trimmed || isLoading) return;
+    const trimmed = text.trim();
+    if (!trimmed || isLoading) return;
 
-  setInput('');
-  setShowQuickSymptoms(false);
+    setInput('');
+    setShowQuickSymptoms(false);
 
-  const userMsg: ChatMessageType = {
-    id: crypto.randomUUID(),
-    role: 'user',
-    content: trimmed,
-    timestamp: new Date(),
-  };
-
-  const loadingMsg: ChatMessageType = {
-    id: 'loading',
-    role: 'assistant',
-    content: '',
-    timestamp: new Date(),
-    isLoading: true,
-  };
-
-  setMessages(prev => [...prev, userMsg, loadingMsg]);
-  setIsLoading(true);
-
-  try {
-    // ✅ FIXED API CALL
-    const res = await fetch("https://dummyjson.com/posts/1");
-
-    if (!res.ok) {
-      throw new Error(`HTTP ${res.status}`);
-    }
-
-    const data: any = await res.json();
-
-    const assistantMsg: ChatMessageType = {
-  id: crypto.randomUUID(),
-  role: 'assistant',
-  content: "Based on your symptoms, you may have a viral infection",
-  timestamp: new Date(),
-};
-
-    setMessages(prev =>
-      prev.filter(m => m.id !== 'loading').concat(assistantMsg)
-    );
-
-  } catch (err) {
-    console.error('Agent error:', err);
-
-    const errorMsg: ChatMessageType = {
+    const userMsg: ChatMessageType = {
       id: crypto.randomUUID(),
-      role: 'assistant',
-      content: 'I apologize, I encountered an error processing your request. Please try again.',
+      role: 'user',
+      content: trimmed,
       timestamp: new Date(),
     };
 
-    setMessages(prev =>
-      prev.filter(m => m.id !== 'loading').concat(errorMsg)
-    );
-  } finally {
-    setIsLoading(false);
-    setTimeout(() => inputRef.current?.focus(), 100);
-  }
-}, [isLoading]);
-const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault();
-    sendMessage(input);
-  }
-};
+    const loadingMsg: ChatMessageType = {
+      id: 'loading',
+      role: 'assistant',
+      content: '',
+      timestamp: new Date(),
+      isLoading: true,
+    };
 
-const handleReset = () => {
-  setMessages([WELCOME_MESSAGE]);
-  setConversationId(undefined);
-  setAgentState(null);
-  setInput('');
-  setShowQuickSymptoms(true);
-};
+    setMessages(prev => [...prev, userMsg, loadingMsg]);
+    setIsLoading(true);
 
-const userTurns = messages.filter(m => m.role === 'user').length;
+    try {
+      const res = await fetch(HEALTH_AGENT_URL, {
+        method: 'POST',
+        headers: AGENT_HEADERS,
+        body: JSON.stringify({
+          message: trimmed,
+          conversationId,
+          sessionId,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+
+      const data: AgentResponse = await res.json();
+
+      const assistantMsg: ChatMessageType = {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: data.response,
+        timestamp: new Date(),
+      };
+
+      setMessages(prev => prev.filter(m => m.id !== 'loading').concat(assistantMsg));
+      setConversationId(data.conversationId);
+      setAgentState(data.agentState);
+    } catch (err) {
+      console.error('Agent error:', err);
+      const errorMsg: ChatMessageType = {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: 'I apologize, I encountered an error processing your request. Please try again.',
+        timestamp: new Date(),
+      };
+      setMessages(prev => prev.filter(m => m.id !== 'loading').concat(errorMsg));
+    } finally {
+      setIsLoading(false);
+      setTimeout(() => inputRef.current?.focus(), 100);
+    }
+  }, [isLoading, conversationId, sessionId]);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage(input);
+    }
+  };
+
+  const handleReset = () => {
+    setMessages([WELCOME_MESSAGE]);
+    setConversationId(undefined);
+    setAgentState(null);
+    setInput('');
+    setShowQuickSymptoms(true);
+  };
+
+  const userTurns = messages.filter(m => m.role === 'user').length;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-teal-50/30 to-cyan-50/40 flex flex-col">

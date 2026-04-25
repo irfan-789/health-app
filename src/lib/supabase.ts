@@ -5,7 +5,7 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-export const HEALTH_AGENT_URL = "https://dummyjson.com/posts/1";
+export const HEALTH_AGENT_URL = `${supabaseUrl}/functions/v1/health-agent`;
 export const AGENT_HEADERS = {
   'Authorization': `Bearer ${supabaseAnonKey}`,
   'Content-Type': 'application/json',
